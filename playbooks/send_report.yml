@@ -1,0 +1,112 @@
+---  # This indicates the start of a YAML document (important!)
+- hosts: localhost # Or specify your target hosts
+  vars:
+    - vars.yml
+
+  tasks: # The 'tasks' section is essential
+
+    ### Return the latest artifact name:
+    - name: Read user_token from file (using lookup)
+      set_fact:
+        user_token: "{{ lookup('file', '/mnt/output/user_token.txt') | trim }}"
+
+    - name: Read latest artifact from file
+      set_fact:
+        aritfact_name: "{{ lookup('file', '/mnt/output/latest_artifact.txt') | trim }}"
+
+    - name: Debug Verify the artifact name was read correctly
+      debug:
+        msg: "Artifact name from file: {{ aritfact_name }}"
+
+    
+    - name: Get Execution Summary
+      uri:
+        url: "https://{{ abot_endpoint }}/abotrest/abot/api/v5/artifacts/execFeatureSummary?foldername={{  aritfact_name }}&page=1&limit=9998"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ user_token }}"
+        return_content: yes
+        status_code: [200, 201]
+      register: execution_summary_response
+
+    - name: Extract execution summary data (if available)
+      set_fact:
+        execution_summary_data: "{{ execution_summary_response.json.feature_summary.result.data }}"
+      when: execution_summary_response.status == 200
+
+    - name: Print Feature Summary for Failed Features and Send to Slack
+      debug:
+        msg: >-
+          Feature: {{ item.featureName }}
+          Passed: {{ item.steps.passed }}
+          Failed: {{ item.steps.failed }}
+          Skipped: {{ item.steps.skipped }}
+          Total: {{ item.steps.total }}
+      loop: "{{ execution_summary_data }}"
+      when: 
+        - execution_summary_response.status == 200
+        - execution_summary_data is defined
+        - item.steps.failed | int > 0
+      register: feature_summary_failed
+
+    - name: Initialize failed features list
+      set_fact:
+        failed_features: []
+        failed: false
+
+    - name: Check for failed tests in execution summary
+      set_fact:
+        failed: true
+        failed_features: "{{ failed_features + [item.featureName] }}"
+      loop: "{{ execution_summary_data }}"
+      when: item.steps.failed | int > 0
+
+    - name: Prepare the Slack message
+      set_fact:
+        slack_message: |
+          {% if failed %}
+            Some tests failed, please check the logs.
+            {% for feature in failed_features %}
+                *Feature Name:*  {{ feature }}
+            {% endfor %}
+          {% else %}
+            All test cases passed! Promoting to outbound registry.
+          {% endif %}
+
+    - name: Send feature summary to Slack
+      uri:
+        url: "https://hooks.slack.com/services/{{ slack_webhook_url }}"
+        method: POST
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+        body: >-
+          {
+            "text": "{{ slack_message }}"
+          }
+      
+      when: feature_summary_failed is defined
+      ignore_errors: yes  # Optional: Ignore errors if Slack notification fails
+
+
+    
+    - name: Send URL to Slack
+      uri:
+        url: "https://hooks.slack.com/services/{{ slack_webhook_url }}"
+        method: POST
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+        body: >-
+          {
+            "text": "For detailed results, please visit: https://{{ abot_endpoint }}/abot/#/artifacts/dashboard/features/open5gs/default-build/{{ aritfact_name }}"
+          }
+        status_code: 200
+      ignore_errors: yes  # Optional: Ignore errors if Slack notification fails
+
+    
+    - name: Save Final result to file
+      copy:
+        content: "{{ failed }}"
+        dest: "{{ output_dir }}/slack_message.txt"

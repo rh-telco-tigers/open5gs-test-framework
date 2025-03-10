@@ -1,0 +1,5 @@
+abot_endpoint: "abot-nginx-abot.apps.fireline.tmetse.bos2.lab"
+config_file_path: "/etc/rebaca-test-suite/config/admin/ABotConfig.properties"
+slack_webhook_url: "T027F3GAJ/B08CR9PG2JD/HaaSQVhEG0mdZgMufVhwMuNd"
+output_dir: "/mnt/output"
+ip_file_path: "/etc/rebaca-test-suite/config/admin/open5gs/nodes-properties/nodes-5G-open5gs-pcf-nrf-sut.properties"

@@ -1,0 +1,21 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: cleanup
+  namespace: demo
+spec:
+  steps:
+    - computeResources: {}
+      image: busybox
+      name: no-op
+      script: |
+        #!/bin/sh
+        echo "check contents"
+        ls /mnt/output
+
+        rm -r /mnt/ansible-repo
+        rm -rf /mnt/output
+        rm -rf /mnt/open5gs
+  workspaces:
+    - mountPath: /mnt
+      name: output

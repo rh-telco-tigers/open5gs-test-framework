@@ -1,0 +1,136 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: pcf-pipeline
+  namespace: demo
+spec:
+  finally:
+    - name: destroy-environment
+      taskRef:
+        params:
+          - name: name
+            value: cleanup
+          - name: namespace
+            value: demo
+          - name: kind
+            value: task
+        resolver: cluster
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+  params:
+    - description: Registry of the pushed image
+      name: image_registry
+      type: string
+    - description: Tag of the pushed image
+      name: imageTag
+      type: string
+  tasks:
+    - name: create-environment
+      params:
+        - name: image_registry
+          value: $(params.image_registry)
+        - name: imageTag
+          value: $(params.imageTag)
+      taskRef:
+        params:
+          - name: name
+            value: create-environment
+          - name: namespace
+            value: demo
+          - name: kind
+            value: task
+        resolver: cluster
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: deploy-new-version
+      params:
+        - name: image_registry
+          value: $(params.image_registry)
+        - name: imageTag
+          value: $(params.imageTag)
+      runAfter:
+        - create-environment
+      taskRef:
+        params:
+          - name: name
+            value: image-pull
+          - name: namespace
+            value: demo
+          - name: kind
+            value: task
+        resolver: cluster
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: test-execution
+      runAfter:
+        - deploy-new-version
+      taskRef:
+        params:
+          - name: name
+            value: test-execution-task
+          - name: namespace
+            value: demo
+          - name: kind
+            value: task
+        resolver: cluster
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: results-validation
+      runAfter:
+        - test-execution
+      taskRef:
+        params:
+          - name: name
+            value: results-validation
+          - name: namespace
+            value: demo
+          - name: kind
+            value: task
+        resolver: cluster
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: report
+      runAfter:
+        - results-validation
+      taskRef:
+        params:
+          - name: name
+            value: send-results-to-slack
+          - name: namespace
+            value: demo
+          - name: kind
+            value: task
+        resolver: cluster
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: promote-new-version
+      params:
+        - name: image_registry
+          value: $(params.image_registry)
+        - name: imageTag
+          value: $(params.imageTag)
+      taskRef:
+        params:
+          - name: name
+            value: promote-new-version
+          - name: namespace
+            value: demo
+          - name: kind
+            value: task
+        resolver: cluster
+      when:
+        - input: $(tasks.report.results.message)
+          operator: in
+          values:
+            - pass
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+  workspaces:
+    - name: shared-workspace

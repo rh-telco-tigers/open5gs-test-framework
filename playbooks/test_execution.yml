@@ -1,0 +1,47 @@
+---  # This indicates the start of a YAML document (important!)
+- hosts: localhost # Or specify your target hosts
+  vars:
+    - vars.yml
+  tasks: # The 'tasks' section is essential
+    
+    - name: Read user_token from file (using lookup)
+      set_fact:
+        user_token: "{{ lookup('file', '/mnt/output/user_token.txt') | trim }}"
+
+    - name: Debug Verify the token was read correctly
+      debug:
+        msg: "Token from file: {{ user_token }}"
+    
+    - name: Read update config response from file (using lookup)
+      set_fact:
+        update_config_response: "{{ lookup('file', '/mnt/output/update_config.txt') | from_json }}"
+
+    - name: Debug Verify the response was read correctly
+      debug:
+        msg: "Token from file: {{ update_config_response }}"
+
+    # Next Phase- Executing the Feature File
+    - name: Execute featurefile
+      uri:
+        url: "https://{{ abot_endpoint }}/abotrest/abot/api/v5/feature_files/execute"
+        validate_certs: false
+        method: POST
+        headers:
+          Authorization: "Bearer {{ user_token }}"
+          Content-Type: "application/json"
+        body: >-
+          {
+            "params": "pcf-as-sut"
+          }
+        body_format: json
+        status_code: [200, 201]
+      when:  update_config_response.status == 200
+      #when: lookup('env', 'update_config_response') | int == 200
+      register: featurefile_response
+
+    - debug:
+        msg: "Featurefile Execution Response: {{ featurefile_response }}"
+      when: featurefile_response is defined
+
+
+    

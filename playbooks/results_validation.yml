@@ -1,0 +1,129 @@
+---  # This indicates the start of a YAML document (important!)
+- hosts: localhost # Or specify your target hosts
+  vars:
+   - vars.yml
+
+
+
+  tasks: # The 'tasks' section is essential
+
+    - name: Read user_token from file (using lookup)
+      set_fact:
+        user_token: "{{ lookup('file', '/mnt/output/user_token.txt') | trim }}"
+
+    - name: Debug Verify the token was read correctly
+      debug:
+        msg: "Token from file: {{ user_token }}"
+    
+    ### Checking the execution status.
+    - name: Execution status
+      uri:
+        url: "https://{{ abot_endpoint }}/abotrest/abot/api/v5/execution_status"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ user_token }}"
+        status_code: [200]
+      register: execution_status_response
+      until: execution_status_response.json.executing.status == False
+      retries: 15  # Adjust based on your requirement
+      delay: 40 # Wait time in seconds between retries
+
+    - debug:
+        msg: "Execution Status Response: {{ execution_status_response }}"
+      when: execution_status_response is defined
+
+    - name: Handle execution status failure
+      debug:
+        msg: "Execution status failed"
+      when: execution_status_response.status != 200
+
+
+    ### Return the latest artifact name:
+    - name: Get latest artifact name
+      uri:
+        url: "https://{{ abot_endpoint }}/abotrest/abot/api/v5/latest_artifact_name"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ user_token }}"
+        status_code: [200]
+      register: latest_artifact_response
+
+    - debug:
+        msg: "Latest Artifact Response: {{ latest_artifact_response }}"
+    
+    - set_fact:
+        latest_artifact_timestamp: "{{ latest_artifact_response.json.data.latest_artifact_timestamp }}"
+
+    - name: Handle failure for latest artifact name
+      debug:
+        msg: "Failed to retrieve the latest artifact name"
+      when: latest_artifact_response.status != 200
+
+    - name: Print the stored timestamp
+      debug:
+        msg: "Latest artifact timestamp: {{ latest_artifact_timestamp }}"
+
+    - name: Save latest artifact name to file
+      copy:
+        content: "{{ latest_artifact_timestamp }}"
+        dest: "{{ output_dir }}/latest_artifact.txt"
+
+    
+    - name: Read latest artifact from file
+      set_fact:
+        aritfact_name: "{{ lookup('file', '/mnt/output/latest_artifact.txt') | trim }}"
+
+    - name: Debug Verify the artifact name was read correctly
+      debug:
+        msg: "Artifact name from file: {{ aritfact_name }}"
+
+
+### Results
+    - name: Get Execution Summary
+      uri:
+        url: "https://{{ abot_endpoint }}/abotrest/abot/api/v5/artifacts/execFeatureSummary?foldername={{ aritfact_name }}&page=1&limit=9998"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{  user_token }}"
+        return_content: yes
+        status_code: [200, 201]
+      register: execution_summary_response
+
+    - name: Print Execution Summary Response
+      debug:
+        msg: "Execution Summary Response: {{ execution_summary_response }}"
+
+    - name: Extract execution summary data (if available)
+      set_fact:
+        execution_summary_data: "{{ execution_summary_response.json.feature_summary.result.data }}"
+      when: execution_summary_response.status == 200
+
+    - name: Print execution summary data
+      debug:
+        msg: "Execution Summary Data: {{ execution_summary_data }}"
+      when: execution_summary_response.status == 200
+
+    - name: Extract 'failed' field from data list
+      set_fact:
+        num_of_errors: "{{ item.steps.failed  }}"
+      loop: "{{ execution_summary_response.json.feature_summary.result.data }}"
+      when: execution_summary_response.status == 200
+
+    - name: Determine final test result based on errors
+      set_fact:
+        final_test_var: "{{ 'Failed' if num_of_errors | int > 0 else 'Passed' }}"
+      when: execution_summary_response.status == 200
+
+    - name: Print final test result
+      debug:
+        msg: "Final Test Result: {{ final_test_var }}"
+      when: execution_summary_response.status == 200
+
+    
+    - name: Save execution summary to file
+      copy:
+        content: "{{ execution_summary_response.json | to_nice_json }}"
+        dest: "{{ output_dir }}/execution_summary.json"

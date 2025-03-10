@@ -1,0 +1,29 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: create-environment
+  namespace: demo
+spec:
+  steps:
+    - computeResources: {}
+      image: 'quay.io/ansible/ansible-runner:latest'
+      name: create-env
+      script: |
+        set -e
+        echo "Disabling SSL verification..."
+        export GIT_SSL_NO_VERIFY=true
+        echo "Checking if /mnt/ansible-repo exists..."
+          if [ -d "/mnt/open5gs" ]; then
+            echo "/mnt/open5gs exists. Deleting..."
+            rm -rf "/mnt/open5gs"
+            echo "/mnt/open5gs deleted."
+          fi
+        echo "Cloning Git repository..."
+        git clone https://gitea01.tmetse.bos2.lab/saahmed/open5gs.git /mnt/open5gs
+        echo "Cloning completed. Current directory contents:"
+        cd /mnt/open5gs
+        pwd  # Prints the current directory
+        ls -al  # Lists the contents of the directory
+  workspaces:
+    - mountPath: /mnt
+      name: output

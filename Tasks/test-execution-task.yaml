@@ -1,0 +1,33 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: test-execution-task
+  namespace: demo
+spec:
+  steps:
+    - computeResources: {}
+      image: 'quay.io/ansible/ansible-runner:latest'
+      name: clone-repository
+      script: |
+        #!/bin/sh
+        set -e
+        echo "Disabling SSL verification..."
+        export GIT_SSL_NO_VERIFY=true
+        echo "Checking if /mnt/ansible-repo exists..."
+          if [ -d "/mnt/ansible-repo" ]; then
+            echo "/mnt/ansible-repo exists. Deleting..."
+            rm -rf "/mnt/ansible-repo"
+            echo "/mnt/ansible-repo deleted."
+          fi
+        echo "Cloning Git repository..."
+        git clone https://gitea01.tmetse.bos2.lab/saahmed/playbooks.git /mnt/ansible-repo
+        echo "Cloning completed. Current directory contents:"
+        cd /mnt/ansible-repo
+        pwd  # Prints the current directory
+        ls -al  # Lists the contents of the directory
+        mkdir -p /mnt/output
+        echo "Running Ansible Playbook..."
+        ansible-playbook /mnt/ansible-repo/test_execution.yml
+  workspaces:
+    - mountPath: /mnt
+      name: output

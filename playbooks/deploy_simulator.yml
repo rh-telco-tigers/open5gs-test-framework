@@ -1,0 +1,109 @@
+---  # This indicates the start of a YAML document (important!)
+- hosts: localhost # Or specify your target hosts
+  vars:
+    - vars.yml
+  tasks: # The 'tasks' section is essential
+    - name: Get User Token
+      uri:
+        validate_certs: false
+        url: "https://{{ abot_endpoint }}/abotrest/abot/api/v5/login"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body: >-
+          {
+            "email": "admin",
+            "password": "admin1234",
+            "expires": false
+          }
+        body_format: json
+        status_code: [200, 201]
+      register: login_response
+
+    - debug:
+        msg: "Login Response: {{ login_response.json }}"
+
+    - set_fact:
+        user_token: "{{ login_response.json.data.token }}"
+      when: login_response.status == 200
+
+    - debug:
+        msg: "User Token: {{ user_token }}"
+
+
+    - name: Save user_token to file (using copy)
+      copy:
+        content: "{{ user_token }}"
+        dest: "{{ output_dir }}/user_token.txt"
+        mode: 0600
+      when: login_response.status == 200
+
+    
+    - name: Read user_token from file (using lookup)
+      set_fact:
+        user_token_from_file: "{{ lookup('file', '/mnt/output/user_token.txt') | trim }}"
+
+    - name: Debug Verify the token was read correctly
+      debug:
+        msg: "Token from file: {{ user_token_from_file }}"
+
+    ### Next Phase Updating the Config
+    - name: Update Config
+      uri:
+        url: "https://{{abot_endpoint}}/abotrest/abot/api/v5/update_config_properties?filename={{ config_file_path | urlencode }}"
+        method: POST
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ user_token_from_file }}"
+          Content-Type: "application/json"
+        body: >-
+          {
+            "update": {
+              {% if TAG == '2.7.1' %}
+                "SUT.AM.POLICY.CREATE.NOTIF.URI": "http://$({abotprop.AMF1.SecureShell.IPAddress}):$({abotprop.AMF1.N15.Server.Port})/npcf-am-policy-control/v1/policies/am-pol-upd-term-notify"
+              {% else %}
+                "SUT.AM.POLICY.CREATE.NOTIF.URI": "$({abotprop.AMF1.SecureShell.IPAddress}):$({abotprop.AMF1.N15.Server.Port})/npcf-am-policy-control/v1/policies/am-pol-upd-term-notify"
+              {% endif %}
+            }
+          }
+        body_format: json
+        status_code: [200, 201]
+      register: update_config_response
+
+    - debug:
+        msg: "Update Config Response: {{ update_config_response }}"
+
+    - name: Check if update is successful
+      debug:
+        msg: "Config update successful" 
+      when: update_config_response.status == 200
+
+    - name: Handle update failure
+      debug:
+        msg: "Config update failed" 
+      when: update_config_response.status != 200
+
+    - name: Save update_config response to file (using copy)
+      copy:
+        content: "{{ update_config_response }}"
+        dest: "{{ output_dir }}/update_config.txt"
+        mode: 0600
+      
+
+
+
+    - name: Update POD IP Address
+      uri:
+        url: "https://{{abot_endpoint}}/abotrest/abot/api/v5/update_config_properties?filename={{ ip_file_path | urlencode }}"
+        validate_certs: false
+        method: POST
+        headers:
+          Authorization: "Bearer {{ user_token_from_file }}"
+          Content-Type: "application/json"
+        body: "{{ {'update': {'PCF1.SecureShell.IPAddress': pcf_ip, 'NRF1.SecureShell.IPAddress': nrf_ip}} | to_json }}"
+        status_code: 200
+        return_content: yes
+      register: pod_ip_response
+
+    - debug:
+        msg: "Update POD IP Response: {{ pod_ip_response }}"

@@ -1,0 +1,11 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: pcf-trigger-binding
+  namespace: demo
+spec:
+  params:
+    - name: image_registry
+      value: $(body.docker_url)
+    - name: imageTag
+      value: '$(body.updated_tags[0])'

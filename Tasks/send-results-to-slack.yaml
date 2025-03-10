@@ -1,0 +1,33 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: send-results-to-slack
+  namespace: demo
+spec:
+  results:
+    - description: indicates whether the unit-testing passsed or is failed
+      name: message
+      type: string
+  steps:
+    - computeResources: {}
+      image: 'quay.io/ansible/ansible-runner:latest'
+      name: send-results-to-slack
+      script: |
+        #!/bin/sh
+        set -e
+        mkdir -p /mnt/output
+        echo "Running Ansible Playbook..."
+        ansible-playbook /mnt/ansible-repo/send_report.yml
+        echo "check if output generated"
+        ls /mnt/output
+        echo "$(cat /mnt/output/slack_message.txt)"
+        echo "copying to results"
+
+        if [ "$(cat /mnt/output/slack_message.txt)" = "True" ]; then
+            printf failed | tee $(results.message.path)
+        else
+            printf pass | tee $(results.message.path)
+        fi
+  workspaces:
+    - mountPath: /mnt
+      name: output

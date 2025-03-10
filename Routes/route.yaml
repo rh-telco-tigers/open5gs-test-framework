@@ -1,0 +1,20 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: el-pcf-event-listener
+  namespace: demo
+  labels:
+    app.kubernetes.io/managed-by: EventListener
+    app.kubernetes.io/part-of: Triggers
+    eventlistener: quay-event-listener
+  annotations:
+    openshift.io/host.generated: 'true'
+spec:
+  host: el-pcf-event-listener-demo.apps.fireline.tmetse.bos2.lab
+  to:
+    kind: Service
+    name: el-quay-event-listener
+    weight: 100
+  port:
+    targetPort: http-listener
+  wildcardPolicy: None
