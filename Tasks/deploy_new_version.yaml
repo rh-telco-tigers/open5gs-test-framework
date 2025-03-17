@@ -1,13 +1,10 @@
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: image-pull
+  name: deploy-new-version
   namespace: demo
 spec:
   params:
-    - description: Registry of the pushed image
-      name: image_registry
-      type: string
     - description: Tag of the pushed image
       name: imageTag
       type: string
