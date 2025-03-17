@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: cleanup
+  name: destroy
   namespace: demo
 spec:
   steps:
