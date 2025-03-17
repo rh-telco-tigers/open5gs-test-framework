@@ -12,16 +12,123 @@ This repository contains an automation framework for testing Open5GS using an Op
 - **pvc.yml**: Defines Persistent Volume Claims (PVCs) used for storing and persisting data during the pipeline execution.
 
 ## Pipeline Workflow
+The pipeline consists of eight tasks. What each task does is detailed below:
 
-1. **Create Environment**: Initializes the environment required for testing Open5GS.
-2. **Deploy New Version**: Deploys the latest version of the Open5GS PCF to the inbound registry.
-3. **Deploy Simulators**: Deploys the required simulators that interact with Open5GS for testing.
-4. **Test Execution Using Rebaca ABot**: Executes tests using the Rebaca ABot.
-5. **Results Validation**: Validates the test results and ensures that all test cases pass successfully.
-6. **Report Generation**: Generates a detailed test report, including success or failure details.
-7. **Promote Version to Integration Registry**: If all test cases pass, the image is promoted from the inbound registry to the outbound registry for integration.
-8. **Cleanup Environment**: Cleans up the testing environment.
+1. **Create Environment Task**  
+   The create-environment task can be found under Tasks -> create-environment.yaml. This task is responsible for cloning the necessary repositories, including the one containing    playbooks for calling Rebaca Abot. These repositories are stored in workspaces, making them accessible to subsequent tasks in the pipeline.
 
+2. **Deploy New Version Task**  
+   This Tekton task is designed to deploy the Open5GS System Under Test (SUT) using Helm and retrieve the PCF pod IP addresses for subsequent tasks.  
+   The image tag is retrieved dynamically from the webhook payload when the image is pushed to Quay.  
+
+   The Tekton task runs a shell script that performs the following steps:  
+
+   - **Helm Upgrade Command:**  
+     The script navigates to the `/mnt/open5gs` directory and executes a Helm upgrade command to deploy the Open5GS SUT.  
+     The image tag is dynamically passed to ensure the correct version is deployed.  
+
+   - **Sleep for Stability:**  
+     A 30-second pause is added to ensure the pods have enough time to start and stabilize before checking their status.  
+
+   - **Store IP Addresses:**  
+     - The script removes any existing `pcf_ip.txt` files to avoid stale data.  
+     - It then retrieves the IP address of the `open5gs-sut-pcf-*` pod that is in the `Running` state, storing the result in `/mnt/pcf_ip.txt`.  
+
+3. **Deploy-Simulator Task**  
+   The Tekton task runs a shell script that performs the following steps:  
+
+   - **Create Output Directory:**  
+     It creates a `/mnt/output` directory to store the results.  
+
+   - **Run the Ansible Playbook:**  
+     The task runs the `deploy_simulator.yml` playbook, which performs following steps:  
+
+     - **User Authentication:**  
+       - Sends a REST API request to obtain a user token for authentication.  
+       - Saves the token to a file for persistent reference.  
+       - Reads the token from the file to ensure secure access for further API requests.  
+
+     - **PCF and NRF IP Update:**  
+       Updates the PCF and NRF IP addresses using the stored token to ensure correct network connectivity.  
+
+     - **Saving the Results:**  
+       The updated configuration details and IP update results are captured and stored in output files to be used by subsequent tasks.  
+
+4. **Test Execution Task**  
+   The Tekton task runs a shell script that performs the following steps:  
+
+   - **Create Output Directory:**  
+     It creates a `/mnt/output` directory to store the results.  
+
+   - **Run the Ansible Playbook:**  
+     The task runs the `test_execution.yml` playbook, which performs following steps:
+
+     - **User Authentication:**  
+       - Reads the token from the file to ensure secure access for further API requests.  
+
+     - **Execute Feature File:**  
+       - The playbook sends a POST request to (https://{{ abot_endpoint }}/abotrest/abot/api/v5/feature_files/execute) with the user_token as a Bearer token for authorization.
+       - It sends the pcf-as-sut as a parameter in the request body.
+       - The request only proceeds if the update_config_response.status is 200 (indicating that the configuration update was successful).
+       - The response of the feature file execution is stored in the featurefile_response variable.
+
+       
+
+
+    
+5. **Results Validation Task**:
+   The Tekton task runs a shell script that performs the following steps:  
+
+   - **Create Output Directory:**  
+     It creates a `/mnt/output` directory to store the results.
+
+   - **Run the Ansible Playbook:**  
+     The task runs the `test_execution.yml` playbook, which performs following steps:
+
+       - **User Authentication:**  
+         - Reads the token from the file to ensure secure access for further API requests.
+  
+       - **Execute Feature File:**  
+         - The playbook queries the execution_status API to confirm that execution has completed.
+         - It retries the status check up to 15 times, with a 40-second delay between attempts to ensure reliable results.
+  
+       - **Get Artifact Name**:
+         - The playbook queries the latest_artifact_name API to obtain the most recent artifact.
+  
+       - **Execution Summary Extraction**:
+         - The playbook queries the execFeatureSummary endpoint to gather detailed execution results for the identified artifact.
+  
+       - **Count No of Failed Test Cases**:
+         - The playbook iterates through the data list to count failed steps.
+
+    - Determine Final Test Result:
+      Based on the number of errors, it defines the test result as either "Passed" or "Failed".
+
+
+5. **Report**:
+   The Tekton task runs a shell script that performs the following steps:  
+
+   - **Create Output Directory:**  
+     It creates a `/mnt/output` directory to store the results.
+
+   - **Run the Ansible Playbook:**  
+     The task runs the `send_report.yml` playbook, which performs following steps:
+
+       - **Get Execution Summaryn:**  
+         - The playbook makes a GET request to an API endpoint to retrieve the execution summary. The results are saved in a variable for the next steps.
+       - **Check Failures:**  
+         - The playbook examines the retrieved data to find any failed tests. If failures are detected, it prepares a Slack message listing the failed features. If all tests pass, the message confirms that the image is ready for promotion to the integration registry.
+       - **Send Slack Message:**  
+         - Depending on the test results, a Slack message is sent to notify the team. This helps everyone stay updated without manual checks.
+       - **Save Final Result:**  
+         - The outcome (TRUE or FALSE) is saved in a text file for reference in the tekton task.
+
+
+6. **Promote New Version Task**:
+   This tekton task automates the process of promoting the image that has passed all test cases. It takes the image tag as a parameter and transfers the image from inbound repositroty to integration repository. 
+   
+7. **Destroy Task**:
+   This task deletes the /mnt/ansible-repo, /mnt/output, and /mnt/open5gs directories to ensure a clean state for the next pipeline run.
 ## Triggering the Pipeline
 
 Once a new version of the Open5GS PCF is pushed to the inbound registry, it triggers the pipeline. The pipeline proceeds with the following steps:
