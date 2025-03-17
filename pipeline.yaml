@@ -46,8 +46,6 @@ spec:
           workspace: shared-workspace
     - name: deploy-new-version
       params:
-        - name: image_registry
-          value: $(params.image_registry)
         - name: imageTag
           value: $(params.imageTag)
       runAfter:
@@ -55,7 +53,7 @@ spec:
       taskRef:
         params:
           - name: name
-            value: image-pull
+            value: deploy-new-version
           - name: namespace
             value: demo
           - name: kind
