@@ -2,11 +2,13 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
   name: pcf-trigger-template
-  namespace: demo
+  namespace: test
 spec:
   params:
     - description: registry of the pushed image
       name: image_registry
+    - description: repository of the pushed image
+      name: image_repository
     - description: Tag of the latest image
       name: imageTag
   resourcetemplates:
@@ -18,6 +20,8 @@ spec:
         params:
           - name: image_registry
             value: $(tt.params.image_registry)
+          - name: image_repository
+            value: $(tt.params.image_repository)
           - name: imageTag
             value: $(tt.params.imageTag)
         pipelineRef:
@@ -25,11 +29,11 @@ spec:
             - name: name
               value: pcf-pipeline
             - name: namespace
-              value: demo
+              value: test
             - name: kind
               value: pipeline
           resolver: cluster
         workspaces:
           - name: shared-workspace
             persistentVolumeClaim:
-              claimName: abotworkspace
+              claimName: open5gs-workspace

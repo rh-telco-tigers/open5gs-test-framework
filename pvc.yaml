@@ -1,8 +1,8 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: abotworkspace
-  namespace: demo
+  name: open5gs-workspace
+  namespace: test
 spec:
   accessModes:
     - ReadWriteOnce

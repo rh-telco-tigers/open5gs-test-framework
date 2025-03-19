@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: pcf-pipeline
-  namespace: demo
+  namespace: test
 spec:
   finally:
     - name: destroy-environment
@@ -11,7 +11,7 @@ spec:
           - name: name
             value: destroy
           - name: namespace
-            value: demo
+            value: test
           - name: kind
             value: task
         resolver: cluster
@@ -22,6 +22,9 @@ spec:
     - description: Registry of the pushed image
       name: image_registry
       type: string
+    - description: Repository of the pushed image
+      name: image_repository
+      type: string
     - description: Tag of the pushed image
       name: imageTag
       type: string
@@ -30,6 +33,8 @@ spec:
       params:
         - name: image_registry
           value: $(params.image_registry)
+        - name: image_repository
+          value: $(params.image_repository)
         - name: imageTag
           value: $(params.imageTag)
       taskRef:
@@ -37,7 +42,7 @@ spec:
           - name: name
             value: create-environment
           - name: namespace
-            value: demo
+            value: test
           - name: kind
             value: task
         resolver: cluster
@@ -46,6 +51,10 @@ spec:
           workspace: shared-workspace
     - name: deploy-new-version
       params:
+        - name: image_registry
+          value: $(params.image_registry)
+        - name: image_repository
+          value: $(params.image_repository)
         - name: imageTag
           value: $(params.imageTag)
       runAfter:
@@ -55,7 +64,29 @@ spec:
           - name: name
             value: deploy-new-version
           - name: namespace
-            value: demo
+            value: test
+          - name: kind
+            value: task
+        resolver: cluster
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: deploy-simulators
+      params:
+        - name: image_registry
+          value: $(params.image_registry)
+        - name: image_repository
+          value: $(params.image_repository)
+        - name: imageTag
+          value: $(params.imageTag)
+      runAfter:
+        - deploy-new-version
+      taskRef:
+        params:
+          - name: name
+            value: deploy-simulators
+          - name: namespace
+            value: test
           - name: kind
             value: task
         resolver: cluster
@@ -64,13 +95,13 @@ spec:
           workspace: shared-workspace
     - name: test-execution
       runAfter:
-        - deploy-new-version
+        - deploy-simulators
       taskRef:
         params:
           - name: name
             value: test-execution-task
           - name: namespace
-            value: demo
+            value: test
           - name: kind
             value: task
         resolver: cluster
@@ -85,7 +116,7 @@ spec:
           - name: name
             value: results-validation
           - name: namespace
-            value: demo
+            value: test
           - name: kind
             value: task
         resolver: cluster
@@ -100,7 +131,7 @@ spec:
           - name: name
             value: send-results-to-slack
           - name: namespace
-            value: demo
+            value: test
           - name: kind
             value: task
         resolver: cluster
@@ -111,6 +142,8 @@ spec:
       params:
         - name: image_registry
           value: $(params.image_registry)
+        - name: image_repository
+          value: $(params.image_repository)
         - name: imageTag
           value: $(params.imageTag)
       taskRef:
@@ -118,7 +151,7 @@ spec:
           - name: name
             value: promote-new-version
           - name: namespace
-            value: demo
+            value: test
           - name: kind
             value: task
         resolver: cluster

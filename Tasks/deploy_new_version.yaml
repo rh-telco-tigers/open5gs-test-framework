@@ -2,26 +2,40 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: deploy-new-version
-  namespace: demo
+  namespace: test
 spec:
   params:
+    - description: Registry of the pushed image
+      name: image_registry
+      type: string
+    - description: Repository of the pushed image
+      name: image_repository
+      type: string
     - description: Tag of the pushed image
       name: imageTag
       type: string
   steps:
     - computeResources: {}
-      image: 'alpine/helm:latest'
+      image: 'quay.io/rh-ee-saahmed/helm-kubectl:latest'
       name: print-image-info
       script: |
         #!/bin/sh
         set -e
         echo "$(params.image_registry)"
-        echo "Tag is"
-        echo "$(params.imageTag)"
-        echo "Checking pods"
-        echo "Listing all namespaces in the cluster:"
-        helm list --all-namespaces
+        registry_name=$(echo "$(params.image_registry)" | awk -F'/' '{print $1}')
+
+        cd /mnt/open5gs
+        helm upgrade open5gs-sut . \
+        --set global.image.tag="$(params.imageTag)" \
+        --set global.image.registry=$registry_name \
+        --set global.image.repository="$(params.image_repository)" \
+        --namespace abot
+
+        sleep 30
+
+
+        kubectl get pods -n abot -o wide --sort-by=.metadata.creationTimestamp | grep 'open5gs-sut-pcf-' | grep 'Running' | tail -n 1 | awk '{print $6}'  > /mnt/pcf_ip.txt
+        kubectl get pods -n abot -o wide | grep open5gs-sut-nrf-* | awk '{print $6}' > /mnt/nrf_ip.txt
   workspaces:
     - mountPath: /mnt
       name: output
-

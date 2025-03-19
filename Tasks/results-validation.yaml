@@ -2,15 +2,8 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: results-validation
-  namespace: demo
+  namespace: test
 spec:
-  results:
-    - description: The latest artifact timestamp
-      name: latest-artifact
-      type: string
-    - description: Execution summary data in JSON format
-      name: execution-summary
-      type: string
   steps:
     - computeResources: {}
       image: 'quay.io/ansible/ansible-runner:latest'
@@ -21,8 +14,6 @@ spec:
         mkdir -p /mnt/output
         echo "Running Ansible Playbook..."
         ansible-playbook /mnt/ansible-repo/results_validation.yml
-        echo "check if output generated"
-        ls /mnt/output
   workspaces:
     - mountPath: /mnt
       name: output

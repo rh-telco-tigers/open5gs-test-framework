@@ -2,20 +2,18 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: destroy
-  namespace: demo
+  namespace: test
 spec:
   steps:
     - computeResources: {}
-      image: busybox
+      image: quay.io/centos/centos
       name: no-op
       script: |
         #!/bin/sh
-        echo "check contents"
-        ls /mnt/output
-
         rm -r /mnt/ansible-repo
         rm -rf /mnt/output
         rm -rf /mnt/open5gs
+        echo "Destroyed"
   workspaces:
     - mountPath: /mnt
       name: output

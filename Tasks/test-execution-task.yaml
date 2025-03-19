@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: test-execution-task
-  namespace: demo
+  namespace: test
 spec:
   steps:
     - computeResources: {}
@@ -11,17 +11,14 @@ spec:
       script: |
         #!/bin/sh
         set -e
-        echo "Disabling SSL verification..."
-        export GIT_SSL_NO_VERIFY=true
-        echo "Checking if /mnt/ansible-repo exists..."
-          if [ -d "/mnt/ansible-repo" ]; then
-            echo "/mnt/ansible-repo exists. Deleting..."
-            rm -rf "/mnt/ansible-repo"
-            echo "/mnt/ansible-repo deleted."
-          fi
-        echo "Cloning Git repository..."
-        git clone https://gitea01.tmetse.bos2.lab/saahmed/playbooks.git /mnt/ansible-repo
-        echo "Cloning completed. Current directory contents:"
+        ls -l /mnt
+
+        echo "Update Config Response is:"
+        update_config_response=$(cat /mnt/output/update_config.txt)
+        echo "update_config_response"
+
+
+
         cd /mnt/ansible-repo
         pwd  # Prints the current directory
         ls -al  # Lists the contents of the directory

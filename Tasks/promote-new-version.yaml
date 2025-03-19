@@ -2,11 +2,14 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: promote-new-version
-  namespace: demo
+  namespace: test
 spec:
   params:
     - description: Registry of the pushed image
       name: image_registry
+      type: string
+    - description: Repository of the pushed image
+      name: image_repository
       type: string
     - description: Tag of the pushed image
       name: imageTag
@@ -19,10 +22,11 @@ spec:
         #!/bin/bash
 
         # Source and destination registry details
-        SOURCE_REGISTRY="lab-registry.tmetse.bos2.lab"
-        DEST_REGISTRY="lab-registry.tmetse.bos2.lab"
-        SOURCE_REPO="saahmed/inbound-registry"
-        DEST_REPO="saahmed/integration-registry"
+        registry_name=$(echo "$(params.image_registry)" | awk -F'/' '{print $1}')
+        SOURCE_REGISTRY=$registry_name
+        DEST_REGISTRY=$registry_name
+        SOURCE_REPO="$(params.image_repository)"
+        DEST_REPO="<your_destination_repo"
         echo "$(params.imageTag)"
         TAG="$(params.imageTag)"
         # Copy the image

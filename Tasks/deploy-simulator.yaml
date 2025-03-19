@@ -1,0 +1,43 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy-simulators
+  namespace: test
+spec:
+  params:
+    - description: Registry of the pushed image
+      name: image_registry
+      type: string
+    - description: Repository of the pushed image
+      name: image_repository
+      type: string
+    - description: Tag of the pushed image
+      name: imageTag
+      type: string
+  steps:
+    - computeResources: {}
+      image: 'quay.io/ansible/ansible-runner:latest'
+      name: print-image-info
+      script: |
+        #!/bin/sh
+        set -e
+
+        mkdir /mnt/output
+
+        echo "PCF IPs:"
+        pcf_ip=$(cat /mnt/pcf_ip.txt)
+
+
+        echo "NRF IPs:"
+        nrf_ip=$(cat /mnt/nrf_ip.txt)
+
+
+        echo "Tag"
+        echo "$(params.imageTag)"
+
+        cd /mnt/open5gs
+
+        ansible-playbook /mnt/ansible-repo/deploy_simulator.yml -e "{\"pcf_ip\": \"$pcf_ip\", \"nrf_ip\": \"$nrf_ip\", \"TAG\": \"$(params.imageTag)\"}"
+  workspaces:
+    - mountPath: /mnt
+      name: output

@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: create-environment
-  namespace: demo
+  namespace: test
 spec:
   steps:
     - computeResources: {}
@@ -12,18 +12,28 @@ spec:
         set -e
         echo "Disabling SSL verification..."
         export GIT_SSL_NO_VERIFY=true
-        echo "Checking if /mnt/ansible-repo exists..."
+        echo "Checking if /mnt/open5gs exists..."
           if [ -d "/mnt/open5gs" ]; then
             echo "/mnt/open5gs exists. Deleting..."
             rm -rf "/mnt/open5gs"
             echo "/mnt/open5gs deleted."
           fi
-        echo "Cloning Git repository..."
+        echo "Cloning Open5gs repository..."
         git clone https://gitea01.tmetse.bos2.lab/saahmed/open5gs.git /mnt/open5gs
+
+
+        echo "-------"
+
+        echo "Checking if /mnt/ansible-repo exists..."
+          if [ -d "/mnt/ansible-repo" ]; then
+            echo "/mnt/ansible-repo exists. Deleting..."
+            rm -rf "/mnt/ansible-repo"
+            echo "/mnt/ansible-repo deleted."
+          fi
+        echo "Cloning Open5gs repository..."
+        git clone <your_git_repository> /mnt/ansible-repo
+
         echo "Cloning completed. Current directory contents:"
-        cd /mnt/open5gs
-        pwd  # Prints the current directory
-        ls -al  # Lists the contents of the directory
   workspaces:
     - mountPath: /mnt
       name: output
