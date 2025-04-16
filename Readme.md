@@ -62,8 +62,8 @@ The pipeline consists of eight tasks. What each task does is detailed below:
    - **Create Output Directory:**  
      It creates a `/mnt/output` directory to store the results.  
 
-   - **Run the Ansible Playbook:**  
-     The task runs the `test_execution.yml` playbook, which performs following steps:
+   - **Run the Ansible Job Template:**  
+     The task runs the `Execute_Test` Job Template, which performs following steps:
 
      - **User Authentication:**  
        - Reads the token from the file to ensure secure access for further API requests.  
@@ -75,36 +75,30 @@ The pipeline consists of eight tasks. What each task does is detailed below:
        - The response of the feature file execution is stored in the featurefile_response variable.
 
        
-
-
     
 5. **Results Validation Task**:
    The Tekton task runs a shell script that performs the following steps:  
 
    - **Create Output Directory:**  
-     It creates a `/mnt/output` directory to store the results.
+     It creates a `/mnt/output` directory to store the results.  
 
-   - **Run the Ansible Playbook:**  
-     The task runs the `test_execution.yml` playbook, which performs following steps:
+   - **Fetch AAP Job Template:**  
+     - API Called: GET /api/v2/job_templates/?name=Result_Validation
+     - Queries AAP to retrieve the Job Template ID for the template named Result_Validation.
 
-       - **User Authentication:**  
-         - Reads the token from the file to ensure secure access for further API requests.
-  
-       - **Execute Feature File:**  
-         - The playbook queries the execution_status API to confirm that execution has completed.
-         - It retries the status check up to 15 times, with a 40-second delay between attempts to ensure reliable results.
-  
-       - **Get Artifact Name**:
-         - The playbook queries the latest_artifact_name API to obtain the most recent artifact.
-  
-       - **Execution Summary Extraction**:
-         - The playbook queries the execFeatureSummary endpoint to gather detailed execution results for the identified artifact.
-  
-       - **Count No of Failed Test Cases**:
-         - The playbook iterates through the data list to count failed steps.
+   - **Trigger AAP Job:**  
+      - API Called: POST /api/v2/job_templates/<JOB_TEMPLATE_ID>/launch/
+      - Launches the AAP job using the retrieved Job Template ID.
+      - Passes user_token (read from /mnt/output/user_token.txt) as an extra variable.
+   
+   - **Monitor Job Status:**  
+     Continuously polls the AAP job endpoint until the job status is successful, failed, or canceled.
 
-    - Determine Final Test Result:
-      Based on the number of errors, it defines the test result as either "Passed" or "Failed".
+   - **Extract and Save Job Output:**
+      - API Called: GET /api/v2/jobs/<LATEST_JOB_ID>/stdout/?format=txt
+      - Captures job logs (stdout) and extracts:
+           - Latest artifact timestamp → saved to /mnt/output/latest_artifact.txt
+         
 
 
 5. **Report**:
