@@ -101,7 +101,7 @@ The pipeline consists of eight tasks. What each task does is detailed below:
          
 
 
-5. **Report**:
+5. **Report to Slack**:
    The Tekton task runs a shell script that performs the following steps:  
 
    - **Create Output Directory:**  
