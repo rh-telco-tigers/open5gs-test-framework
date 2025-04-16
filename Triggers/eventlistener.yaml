@@ -10,7 +10,7 @@ spec:
   triggers:
     - bindings:
         - kind: TriggerBinding
-          ref: pcf-trigger-binding
+          ref: quay-trigger-binding
       name: GitHub-listener
       template:
-        ref: pcf-trigger-template
+        ref: quay-trigger-template

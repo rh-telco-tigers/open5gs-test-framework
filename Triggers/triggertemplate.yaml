@@ -1,7 +1,7 @@
 apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
-  name: pcf-trigger-template
+  name: quay-trigger-template
   namespace: test
 spec:
   params:
@@ -15,7 +15,7 @@ spec:
     - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
       metadata:
-        generateName: testing-pipeline-
+        generateName: open5gs-testing-pipeline-
       spec:
         params:
           - name: image_registry
@@ -27,7 +27,7 @@ spec:
         pipelineRef:
           params:
             - name: name
-              value: pcf-pipeline
+              value: open5gs-pipeline
             - name: namespace
               value: test
             - name: kind
@@ -36,4 +36,4 @@ spec:
         workspaces:
           - name: shared-workspace
             persistentVolumeClaim:
-              claimName: open5gs-workspace
+              claimName: abotworkspace

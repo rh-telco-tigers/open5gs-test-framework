@@ -19,21 +19,8 @@ spec:
             echo "/mnt/open5gs deleted."
           fi
         echo "Cloning Open5gs repository..."
-        git clone https://gitea01.tmetse.bos2.lab/saahmed/open5gs.git /mnt/open5gs
+        git clone <git-containing-open5gs-helm-chart> /mnt/open5gs
 
-
-        echo "-------"
-
-        echo "Checking if /mnt/ansible-repo exists..."
-          if [ -d "/mnt/ansible-repo" ]; then
-            echo "/mnt/ansible-repo exists. Deleting..."
-            rm -rf "/mnt/ansible-repo"
-            echo "/mnt/ansible-repo deleted."
-          fi
-        echo "Cloning Open5gs repository..."
-        git clone <your_git_repository> /mnt/ansible-repo
-
-        echo "Cloning completed. Current directory contents:"
   workspaces:
     - mountPath: /mnt
       name: output

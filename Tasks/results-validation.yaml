@@ -6,14 +6,57 @@ metadata:
 spec:
   steps:
     - computeResources: {}
-      image: 'quay.io/ansible/ansible-runner:latest'
+      env:
+        - name: USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: aap-credentials
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: aap-credentials
+      image: quay.io/rh-ee-saahmed/alpine-jq
       name: clone-repository
       script: |
         #!/bin/sh
         cd /mnt/ansible-repo
         mkdir -p /mnt/output
-        echo "Running Ansible Playbook..."
-        ansible-playbook /mnt/ansible-repo/results_validation.yml
+
+        echo "Getting Job Template ID"
+        JOB_TEMPLATE_ID=$(curl -k -u "${USERNAME}:${PASSWORD}" -X GET "https://<aap-api>/api/v2/job_templates/?name=Result_Validation" \
+        -H "Content-Type: application/json" | jq -r '.results[0].id')
+
+
+        export user_token=$(cat /mnt/output/user_token.txt)
+
+        echo "Running Ansible Playbook in AAP"
+        curl -k -u "${USERNAME}:${PASSWORD}" -X POST -H "Content-Type: application/json" -d "{\"extra_vars\": {\"user_token\": \"$user_token\" }}" "https://automation-controller-aap.apps.fireline.tmetse.bos2.lab/api/v2/job_templates/$JOB_TEMPLATE_ID/launch/" 
+
+        LATEST_JOB_ID=$(curl -k -u "${USERNAME}:${PASSWORD}" \
+                            -H "Content-Type: application/json" \
+                      "https://<aap-api>/api/v2/jobs/?order_by=-id&page_size=1" | jq -r '.results[0].id')
+
+
+        while true; do
+            # Get the latest job status
+             JOB_STATUS=$(curl -k -u "${USERNAME}:${PASSWORD}" -H "Content-Type: application/json" "https://<aap-api>/api/v2/jobs/$LATEST_JOB_ID/" | jq -r '.status')
+            
+              if [[ "$JOB_STATUS" == "successful" || "$JOB_STATUS" == "failed" || "$JOB_STATUS" == "canceled" ]]; then
+                  echo "Job finished with status: $JOB_STATUS"
+                  break
+              fi
+            
+              echo "Waiting for job to finish..."
+              sleep 15  # Wait for 10 seconds before checking again
+        done
+
+        echo "Retrieving Latest Artifact Name"
+        curl -k -u "${USERNAME}:${PASSWORD}" \
+                    -H "Content-Type: application/json" \
+                    "https://<aap-api>/api/v2/jobs/$LATEST_JOB_ID/stdout/?format=txt" | \
+                        tee >(grep "Latest artifact timestamp:" | sed 's/.*Latest artifact timestamp: //g' | sed 's/"$//g' > /mnt/output/latest_artifact.txt)
   workspaces:
     - mountPath: /mnt
       name: output

@@ -6,25 +6,40 @@ metadata:
 spec:
   steps:
     - computeResources: {}
-      image: 'quay.io/ansible/ansible-runner:latest'
+      env:
+        - name: USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: aap-credentials
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: aap-credentials
+      image: quay.io/rh-ee-saahmed/alpine-jq
       name: clone-repository
       script: |
         #!/bin/sh
         set -e
-        ls -l /mnt
-
-        echo "Update Config Response is:"
-        update_config_response=$(cat /mnt/output/update_config.txt)
-        echo "update_config_response"
-
-
-
-        cd /mnt/ansible-repo
-        pwd  # Prints the current directory
-        ls -al  # Lists the contents of the directory
         mkdir -p /mnt/output
-        echo "Running Ansible Playbook..."
-        ansible-playbook /mnt/ansible-repo/test_execution.yml
+
+          echo "Update Config Response is:"
+          update_config_response=$(cat /mnt/output/update_config.json)
+          echo "$update_config_response"
+
+
+        export update_config_response=$(cat /mnt/output/update_config.json | jq -c .)
+        export update_config_response=$(echo "$update_config_response" | sed 's/"/\\"/g')
+        export user_token=$(cat /mnt/output/user_token.txt)
+
+        echo "Getting Job Template ID"
+        JOB_TEMPLATE_ID=$(curl -k -u "${USERNAME}:${PASSWORD}" -X GET "https://<aap-api>/api/v2/job_templates/?name=Execute_Test" \
+        -H "Content-Type: application/json" | jq -r '.results[0].id')
+
+
+        curl -k -u "${USERNAME}:${PASSWORD}" -X POST -H "Content-Type: application/json" -d "{\"extra_vars\": {\"update_config_response\": \"$update_config_response\" , \"user_token\": \"$user_token\" }}" "https://<aap-api>/api/v2/job_templates/$JOB_TEMPLATE_ID/launch/" 
+        echo "Playbook Triggered in AAP"
   workspaces:
     - mountPath: /mnt
       name: output

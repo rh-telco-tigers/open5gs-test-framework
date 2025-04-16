@@ -1,7 +1,7 @@
 ---  # This indicates the start of a YAML document (important!)
 - hosts: localhost # Or specify your target hosts
   vars:
-    - vars.yml
+    - vars.yaml
 
   tasks: # The 'tasks' section is essential
 
@@ -71,7 +71,7 @@
                 *Feature Name:*  {{ feature }}
             {% endfor %}
           {% else %}
-            All test cases passed! Promoting to outbound registry.
+            All test cases passed! Promoting to integration registry.
           {% endif %}
 
     - name: Send feature summary to Slack
@@ -100,7 +100,7 @@
           Content-Type: "application/json"
         body: >-
           {
-            "text": "For detailed results, please visit: https://{{ abot_endpoint }}/abot/#/artifacts/dashboard/features/open5gs/default-build/{{ aritfact_name }}"
+            "text": "For detailed results, please visit: https://abot-nginx-abot.apps.fireline.tmetse.bos2.lab/abot/#/artifacts/dashboard/features/open5gs/default-build/{{ aritfact_name }}"
           }
         status_code: 200
       ignore_errors: yes  # Optional: Ignore errors if Slack notification fails

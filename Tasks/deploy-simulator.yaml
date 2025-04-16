@@ -16,28 +16,88 @@ spec:
       type: string
   steps:
     - computeResources: {}
-      image: 'quay.io/ansible/ansible-runner:latest'
+      env:
+        - name: USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: aap-credentials
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: aap-credentials
+      image: quay.io/rh-ee-saahmed/alpine-jq
       name: print-image-info
       script: |
         #!/bin/sh
         set -e
 
-        mkdir /mnt/output
-
-        echo "PCF IPs:"
+        mkdir -p /mnt/output
         pcf_ip=$(cat /mnt/pcf_ip.txt)
 
-
-        echo "NRF IPs:"
         nrf_ip=$(cat /mnt/nrf_ip.txt)
-
-
-        echo "Tag"
-        echo "$(params.imageTag)"
+        TAG_VALUE="$(params.imageTag)"
 
         cd /mnt/open5gs
 
-        ansible-playbook /mnt/ansible-repo/deploy_simulator.yml -e "{\"pcf_ip\": \"$pcf_ip\", \"nrf_ip\": \"$nrf_ip\", \"TAG\": \"$(params.imageTag)\"}"
+        JOB_TEMPLATE_ID=$(curl -k -u "${USERNAME}:${PASSWORD}" -X GET "https://<aap-api>/api/v2/job_templates/?name=Deploy_Simulators" \
+        -H "Content-Type: application/json" | jq -r '.results[0].id')
+
+        # Check if the Job Template ID was found
+        if [ -z "$JOB_TEMPLATE_ID" ]; then
+          echo "Error: Job template '$JOB_TEMPLATE_NAME' not found!"
+          exit 1
+        fi
+
+         # Step 2: Trigger the job using the Job Template ID
+
+         echo $JOB_TEMPLATE_ID
+
+
+        curl -k -u "${USERNAME}:${PASSWORD}" -X POST "https://<aap-api>/api/v2/job_templates/$JOB_TEMPLATE_ID/launch/" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"extra_vars\": {
+            \"pcf_ip\": \"$pcf_ip\",
+            \"nrf_ip\": \"$nrf_ip\",
+            \"TAG\": \"$TAG_VALUE\"
+          }
+        }"
+
+        echo "Job triggered successfully!" 
+
+
+        LATEST_JOB_ID=$(curl -k -u "${USERNAME}:${PASSWORD}" \
+                            -H "Content-Type: application/json" \
+                      "https://<aap-api>/api/v2/jobs/?order_by=-id&page_size=1" | jq -r '.results[0].id')
+
+
+        echo $LATEST_JOB_ID
+        while true; do
+            # Get the latest job status
+             JOB_STATUS=$(curl -k -u "${USERNAME}:${PASSWORD}" -H "Content-Type: application/json" "https://<aap-api>/api/v2/jobs/$LATEST_JOB_ID/" | jq -r '.status')
+            
+              if [[ "$JOB_STATUS" == "successful" || "$JOB_STATUS" == "failed" || "$JOB_STATUS" == "canceled" ]]; then
+                  echo "Job finished with status: $JOB_STATUS"
+                  break
+              fi
+            
+              echo "Waiting for job to finish..."
+              sleep 4  # Wait for 10 seconds before checking again
+        done
+
+
+        echo "Copying to PVC"
+
+
+        curl -k -u "${USERNAME}:${PASSWORD}" \
+                    -H "Content-Type: application/json" \
+                    "https://<aap-api>/api/v2/jobs/$LATEST_JOB_ID/stdout/?format=txt" | \
+                        tee >(grep "User Token:" | sed 's/.*User Token: //g' | sed 's/"$//g' > /mnt/output/user_token.txt) \
+                     >(grep "Update Config Response:" | sed 's/Update Config Response: //' | sed '1s/^/{\n/' | sed '$s/$/\n}/'> /mnt/output/update_config.json)
+
+        sleep 5
   workspaces:
     - mountPath: /mnt
       name: output

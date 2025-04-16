@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: pcf-pipeline
+  name: open5gs-pipeline
   namespace: test
 spec:
   finally:

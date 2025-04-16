@@ -1,7 +1,7 @@
 ---  # This indicates the start of a YAML document (important!)
 - hosts: localhost # Or specify your target hosts
   vars:
-    - vars.yml
+    - vars.yaml
   tasks: # The 'tasks' section is essential
     
     - name: Read user_token from file (using lookup)

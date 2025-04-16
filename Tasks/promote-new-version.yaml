@@ -26,7 +26,7 @@ spec:
         SOURCE_REGISTRY=$registry_name
         DEST_REGISTRY=$registry_name
         SOURCE_REPO="$(params.image_repository)"
-        DEST_REPO="<your_destination_repo"
+        DEST_REPO="saahmed/integration"
         echo "$(params.imageTag)"
         TAG="$(params.imageTag)"
         # Copy the image

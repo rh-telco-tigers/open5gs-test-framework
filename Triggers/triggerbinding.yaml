@@ -1,7 +1,7 @@
 apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerBinding
 metadata:
-  name: pcf-trigger-binding
+  name: quay-trigger-binding
   namespace: test
 spec:
   params:

@@ -1,7 +1,7 @@
 ---  # This indicates the start of a YAML document (important!)
 - hosts: localhost # Or specify your target hosts
   vars:
-    - vars.yml
+    - var.yaml
   tasks: # The 'tasks' section is essential
     - name: Get User Token
       uri:
@@ -13,7 +13,7 @@
         body: >-
           {
             "email": "admin",
-            "password": "admin1234",
+            "password": "xxxx",
             "expires": false
           }
         body_format: json
@@ -59,7 +59,11 @@
         body: >-
           {
             "update": {
+              {% if TAG == '2.7.1' %}
                 "SUT.AM.POLICY.CREATE.NOTIF.URI": "http://$({abotprop.AMF1.SecureShell.IPAddress}):$({abotprop.AMF1.N15.Server.Port})/npcf-am-policy-control/v1/policies/am-pol-upd-term-notify"
+              {% else %}
+                "SUT.AM.POLICY.CREATE.NOTIF.URI": "$({abotprop.AMF1.SecureShell.IPAddress}):$({abotprop.AMF1.N15.Server.Port})/npcf-am-policy-control/v1/policies/am-pol-upd-term-notify"
+              {% endif %}
             }
           }
         body_format: json
