@@ -40,19 +40,21 @@ The pipeline consists of eight tasks. What each task does is detailed below:
    - **Create Output Directory:**  
      It creates a `/mnt/output` directory to store the results.  
 
-   - **Run the Ansible Playbook:**  
-     The task runs the `deploy_simulator.yml` playbook, which performs following steps:  
+   - **Fetch AAP Job Template:**  
+     Queries AAP to retrieve the Job Template ID for the template named Deploy_Simulators. 
 
-     - **User Authentication:**  
-       - Sends a REST API request to obtain a user token for authentication.  
-       - Saves the token to a file for persistent reference.  
-       - Reads the token from the file to ensure secure access for further API requests.  
+   - **Trigger AAP Job:**  
+      - Launches the AAP job using the fetched template ID.
+      - Passes pcf_ip, nrf_ip, and TAG as extra variables to the job.
 
-     - **PCF and NRF IP Update:**  
-       Updates the PCF and NRF IP addresses using the stored token to ensure correct network connectivity.  
+   - **Monitor Job Status:**  
+     Continuously polls the AAP job endpoint until the job status is successful, failed, or canceled.
 
-     - **Saving the Results:**  
-       The updated configuration details and IP update results are captured and stored in output files to be used by subsequent tasks.  
+   - **Extract and Save Job Output:**
+      - Captures job logs (stdout) and extracts:
+          - User Token → saved to /mnt/output/user_token.txt
+          - Configuration Update Response → saved to /mnt/output/update_config.json
+
 
 4. **Test Execution Task**  
    The Tekton task runs a shell script that performs the following steps:  
